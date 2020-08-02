@@ -1,0 +1,157 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+
+## Loading and preprocessing the data
+
+```r
+library(dplyr)
+```
+
+```
+## 
+## Attaching package: 'dplyr'
+```
+
+```
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+```
+
+```
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+```
+
+```r
+data <- read.csv(unzip("activity.Zip"), header=TRUE, sep=",")
+data <- mutate(data, date=as.Date(as.character(date),"%Y-%m-%d"))
+```
+
+## What is mean total number of steps taken per day?
+
+```r
+per_day <- group_by(data,date)
+per_day <- tapply(X=per_day$steps, INDEX=per_day$date, FUN=sum)
+hist(per_day, breaks=10, col="red", main="Number of steps per day", xlab="Number of steps")
+```
+
+![](PA1_template_files/figure-html/step-by-day-1.png)<!-- -->
+
+```r
+print(paste("mean(steps by day) =",round(mean(per_day, na.rm=TRUE),digits=2), 
+            sep=" "))
+```
+
+```
+## [1] "mean(steps by day) = 10766.19"
+```
+
+```r
+print(paste("median(steps by day) =",round(median(per_day, na.rm=TRUE),digits=2), 
+            sep=" "))
+```
+
+```
+## [1] "median(steps by day) = 10765"
+```
+
+## What is the average daily activity pattern?
+
+```r
+per_int <- group_by(data,interval)
+per_int <- tapply(X=per_int$steps, INDEX=per_int$interval, FUN=mean, na.rm=TRUE)
+plot(names(per_int),per_int, type="l", col="red", lwd=2, main="Average number of steps by interval", ylab="Number of steps", xlab="5 mn interval")
+```
+
+![](PA1_template_files/figure-html/daily-activity-pattern-1.png)<!-- -->
+
+```r
+print(paste("5 mn interval with highest average number of steps :",
+      names(per_int[per_int==max(per_int)]), sep=" "))
+```
+
+```
+## [1] "5 mn interval with highest average number of steps : 835"
+```
+
+## Imputing missing values
+
+```r
+print(paste("Total number of NA:", sum(is.na(data$steps)), sep=" "))
+```
+
+```
+## [1] "Total number of NA: 2304"
+```
+
+```r
+subdata <- subset(data, is.na(steps))
+subdata2 <- subset(data, !is.na(steps))
+# replacing missing values by the average for the interval
+for (i in 1:nrow(subdata)) {
+        int <- subdata$interval[i]
+        j <- 1
+        while (j<dim(per_int) & (!(as.numeric(names(per_int[j]))==int))) {
+                        j <- j+1
+            }
+            subdata$steps[i] <- per_int[j]
+}
+filleddata <- rbind(subdata, subdata2)
+per_day2 <- group_by(filleddata,date)
+per_day2 <- tapply(X=per_day2$steps, INDEX=per_day2$date, FUN=sum)
+hist(per_day2, breaks=10, col="red", main="Number of steps per day", xlab="Number of steps")
+```
+
+![](PA1_template_files/figure-html/imputing NA-1.png)<!-- -->
+
+```r
+print(paste("mean(steps by day) =",round(mean(per_day2, na.rm=TRUE),digits=2), 
+            sep=" "))
+```
+
+```
+## [1] "mean(steps by day) = 10766.19"
+```
+
+```r
+print(paste("median(steps by day) =",round(median(per_day2, na.rm=TRUE),digits=2), 
+            sep=" "))
+```
+
+```
+## [1] "median(steps by day) = 10766.19"
+```
+Imputing missing values did not change the average (10766.19) but has increased the median (from 10765 to the mean, 10766.19)
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+```r
+library(ggplot2)
+filleddata2 <- mutate(filleddata, day=weekdays(date))
+filleddata2 <- cbind(filleddata2, cat=recode(filleddata2$day,
+                "Monday"="Weekday","Tuesday"="Weekday",
+                "Wednesday"="Weekday", "Thursday"="Weekday",
+                "Friday"="Weekday", "Saturday"="Weekend", "Sunday"="Weekend"))
+per_int2 <- group_by(filleddata2,interval, cat)
+sumdata <- summarise(per_int2, avgstep=mean(steps))
+```
+
+```
+## `summarise()` regrouping output by 'interval' (override with `.groups` argument)
+```
+
+```r
+g <- ggplot(data=sumdata, aes(x=interval, y=avgstep))
+g + geom_line() + facet_grid(cat~.) + labs(x= "5mn interval") + 
+  labs(y= "Average number of steps") + 
+  labs(title= "Average number of steps during weekdays and weekends")
+```
+
+![](PA1_template_files/figure-html/weekdays vs weekend-1.png)<!-- -->
